@@ -7,7 +7,7 @@ import {parseCookies, setCookie} from 'nookies'
 import {ConfirmProvider} from 'material-ui-confirm'
 
 import {COOKIE_ENABLE_SECURE, COOKIE_DEFAULT_AGE, COOKIE_PATH, COOKIE_SAME_SITE, COOKIE_THEME} from '@/lib/constants'
-import {getResolution} from '@/lib/helper'
+import {getResolution} from '@/lib/helpers';
 import {AppThemeContextType} from '@/providers/theme'
 
 import {getTheme} from './theme'
@@ -79,8 +79,8 @@ const AppThemeProvider = ({children}: { children: ReactNode }) => {
 
     return (
         <ThemeContext.Provider value={memoValue}>
+            <CssBaseline/>
             <MuiThemeProvider theme={theme}>
-                <CssBaseline/>
                 <ConfirmProvider
                     defaultOptions={{
                         title: "Are you sure?",

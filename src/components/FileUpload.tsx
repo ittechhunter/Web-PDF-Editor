@@ -1,22 +1,18 @@
-import React, { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { Box, Paper, Typography } from '@mui/material';
-import {pdfjs, Document, Page } from 'react-pdf';
-
-import type { PDFDocumentProxy } from 'pdfjs-dist';
-
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.js',
-    import.meta.url,
-).toString();
+import React, {useState, useEffect, useRef} from 'react';
+import {DropEvent} from 'react-dropzone';
+import PSPDFKit from "pspdfkit";
+import {Box, Paper,  Grid} from '@mui/material';
+import DropzoneArea from "@/components/Dropzone/DropzoneArea";
+import PdfViewer from "@/components/PDFContainer/PDFViewer";
 
 
-type PDFFile = string | File | null;
+type PDFFile = File | null;
+
 function FileUpload() {
-
+    const containerRef = useRef(null);
     const [pdfFile, setPdfFile] = useState<PDFFile>(null);
-    const [numPages, setNumPages] = useState<number>();
-    const onDrop = useCallback((acceptedFiles: File[]) => {
+
+    const onDrop = (acceptedFiles: File[], event: DropEvent) => {
         // Ensure only PDF files are accepted
         const isPDF = acceptedFiles.every((file) => file.type === 'application/pdf');
 
@@ -25,41 +21,61 @@ function FileUpload() {
         } else {
             console.error('Invalid file type. Please upload PDF files only.');
         }
-    }, []);
+    }
 
-    const { getRootProps, getInputProps } = useDropzone({
-        onDrop,
-        accept: {'application/pdf': [".pdf"]}, // Accept only PDF files,
-        maxFiles: 1,
-    });
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return
+        (async function () {
+            if (PSPDFKit) {
+                PSPDFKit.unload(container);
+            }
+            if (!pdfFile) return
+            const doc = await pdfFile.arrayBuffer()
+            await PSPDFKit.load({
+                container,
+                document: doc,
+                baseUrl: `${window.location.protocol}//${window.location.host}/`,
+            });
+        })();
 
-    function onDocumentLoadSuccess({ numPages: nextNumPages }: PDFDocumentProxy): void {
-        setNumPages(nextNumPages);
+        // return () => PSPDFKit && PSPDFKit.unload(container);
+    }, [pdfFile]);
+
+    if (!pdfFile) {
+        return (
+            <DropzoneArea
+                acceptedFiles={{'application/pdf': [".pdf"]}}
+                dropzoneText={"Drag and drop an image here or click"}
+                onChange={(files) => console.log('Files:', files)}
+                filesLimit={10}
+                onDrop={onDrop}
+            />
+        )
     }
 
     return (
-        <Paper elevation={3}>
-            <Box {...getRootProps()} p={3} textAlign="center">
-                <input {...getInputProps()} />
-                {pdfFile ? (
-                    <div>
-                        <Document file={pdfFile}  onLoadSuccess={onDocumentLoadSuccess}>
-                            {Array.from(new Array(numPages), (el, index) => (
-                                <Page
-                                    key={`page_${index + 1}`}
-                                    pageNumber={index + 1}
-                                />
-                            ))}
-                        </Document>
-                        <Typography>
-                            Page 1 of {numPages}
-                        </Typography>
-                    </div>
-                ) : (
-                    <Typography>Drag & Drop or Click to Upload PDF</Typography>
-                )}
-            </Box>
-        </Paper>
+        <Grid container spacing={2}>
+            <Grid item xs={8}>
+                <Paper elevation={3} style={{cursor: 'pointer'}}>
+                    <Box p={3} textAlign="center">
+                        <div ref={containerRef} style={{ height: "100vh" }} />
+                    </Box>
+                </Paper>
+
+                <Paper elevation={3} style={{cursor: 'pointer'}}>
+                    <Box p={3} textAlign="center">
+                        <PdfViewer pdfFile={pdfFile}/>
+                    </Box>
+                </Paper>
+            </Grid>
+            <Grid item xs={4}>
+                {/* Side Menu */}
+                <Paper elevation={3}>
+                    {/* Content for side menu */}
+                </Paper>
+            </Grid>
+        </Grid>
     );
 }
 

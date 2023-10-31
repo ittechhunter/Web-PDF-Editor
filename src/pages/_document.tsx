@@ -2,14 +2,16 @@ import Document, {DocumentContext, Head, Html, Main, NextScript} from 'next/docu
 import { parseCookies } from 'nookies'
 import createEmotionServer from '@emotion/server/create-instance'
 import React from "react";
-
+import { AppType } from 'next/app';
 
 import createEmotionCache from '@/lib/createEmotionCache';
 import {getTheme} from '@/providers/theme/theme';
 import {COOKIE_THEME} from "@/lib/constants";
+import {AppProps} from "@/lib/app-providers";
 
 interface MyProps {
-    mode: ThemeMode
+    mode: ThemeMode;
+    emotionStyleTags: JSX.Element[];
 }
 
 type ThemeMode = 'light' | 'dark'
@@ -53,6 +55,10 @@ export default class MyDocument extends Document<MyProps> {
                         rel="stylesheet"
                         href="https://fonts.googleapis.com/icon?family=Material+Icons"
                     />
+
+
+                    <meta name="emotion-insertion-point" content="" />
+                    {this.props.emotionStyleTags}
                 </Head>
                 <body style={{
                     background: theme.palette.background.default || '#1C2128'
@@ -76,9 +82,11 @@ MyDocument.getInitialProps = async ctx => {
 
     ctx.renderPage = () =>
         originalRenderPage({
-            // eslint-disable-next-line
-            enhanceApp: (App: any) => props => <App emotionCache={cache} {...props} />
-        })
+            enhanceApp: (App: React.ComponentType<React.ComponentProps<AppType> & AppProps>) =>
+                function EnhanceApp(props) {
+                    return <App emotionCache={cache} {...props} />;
+                },
+        });
 
     const initialProps = await Document.getInitialProps(ctx)
 

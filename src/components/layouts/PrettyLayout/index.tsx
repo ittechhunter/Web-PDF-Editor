@@ -2,7 +2,7 @@ import React, {ReactNode, useEffect, useState} from "react";
 import {Paper} from "@mui/material";
 import {styled} from "@mui/material/styles";
 
-import {getResolution} from "@/lib/helper";
+import {getResolution} from "@/lib/helpers";
 import {Header} from "@/components/layouts/PrettyLayout/Header";
 
 import {ErrorBoundary} from "@/components/ui/errorBoundary";
