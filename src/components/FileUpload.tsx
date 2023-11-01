@@ -1,16 +1,17 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {DropEvent} from 'react-dropzone';
-import PSPDFKit from "pspdfkit";
-import {Box, Paper,  Grid} from '@mui/material';
-import DropzoneArea from "@/components/Dropzone/DropzoneArea";
-import PdfViewer from "@/components/PDFContainer/PDFViewer";
 
+import {Box, Grid, Paper} from '@mui/material';
+import DropzoneArea from "@/components/Dropzone/DropzoneArea";
+// import PdfViewer from "@/components/PDFContainer/PDFViewer";
+import {PDFDocument} from 'pdf-lib'
+import PDFDesigner from "@/components/PDFContainer/Designer";
 
 type PDFFile = File | null;
 
 function FileUpload() {
-    const containerRef = useRef(null);
-    const [pdfFile, setPdfFile] = useState<PDFFile>(null);
+     const [pdfFile, setPdfFile] = useState<PDFFile>(null);
+    // const [pdfInfo, setPdfInfo] = useState<string|null>(null);
 
     const onDrop = (acceptedFiles: File[], event: DropEvent) => {
         // Ensure only PDF files are accepted
@@ -23,24 +24,22 @@ function FileUpload() {
         }
     }
 
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return
-        (async function () {
-            if (PSPDFKit) {
-                PSPDFKit.unload(container);
-            }
-            if (!pdfFile) return
-            const doc = await pdfFile.arrayBuffer()
-            await PSPDFKit.load({
-                container,
-                document: doc,
-                baseUrl: `${window.location.protocol}//${window.location.host}/`,
-            });
-        })();
-
-        // return () => PSPDFKit && PSPDFKit.unload(container);
-    }, [pdfFile]);
+    // useEffect(() => {
+    //     (async function () {
+    //         if (!pdfFile) return
+    //         const doc = await pdfFile.arrayBuffer()
+    //
+    //         // Load a `PDFDocument` from the existing PDF bytes.
+    //         const pdfDocument = await PDFDocument.load(doc)
+    //         const pdfBytes = await pdfDocument.save();
+    //         const docUrl = URL.createObjectURL(
+    //             new Blob(pdfBytes, { type: "application/pdf" })
+    //         );
+    //         setPdfInfo(docUrl)
+    //     })();
+    //
+    //     // return () => PSPDFKit && PSPDFKit.unload(container);
+    // }, [pdfFile]);
 
     if (!pdfFile) {
         return (
@@ -55,27 +54,11 @@ function FileUpload() {
     }
 
     return (
-        <Grid container spacing={2}>
-            <Grid item xs={8}>
-                <Paper elevation={3} style={{cursor: 'pointer'}}>
-                    <Box p={3} textAlign="center">
-                        <div ref={containerRef} style={{ height: "100vh" }} />
-                    </Box>
-                </Paper>
-
-                <Paper elevation={3} style={{cursor: 'pointer'}}>
-                    <Box p={3} textAlign="center">
-                        <PdfViewer pdfFile={pdfFile}/>
-                    </Box>
-                </Paper>
-            </Grid>
-            <Grid item xs={4}>
-                {/* Side Menu */}
-                <Paper elevation={3}>
-                    {/* Content for side menu */}
-                </Paper>
-            </Grid>
-        </Grid>
+        <Paper elevation={3} style={{cursor: 'pointer'}}>
+            <Box p={3} textAlign="center">
+                <PDFDesigner/>
+            </Box>
+        </Paper>
     );
 }
 
