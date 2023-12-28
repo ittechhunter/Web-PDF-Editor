@@ -67,6 +67,9 @@ int get_category() {
     int op = in_msg_body~load_uint(32);
     int query_id = in_msg_body~load_uint(64);
 
+
+    ;; --------------- From Admin ---------------
+
     if(equal_slices(sender_address, storage::admin_address)) {
         throw_unless(error:unauthorized, storage::revoked_at == 0);
 
@@ -103,17 +106,18 @@ int get_category() {
         if (op == op::process_arbitration_admin) {
             throw_unless(error::not_enough_ton, msg_value >= fee::process_arbitration);
             int order_index = in_msg_body~load_uint(64);
-            int freelancer_part = in_msg_body~load_uint(8);
             int customer_part = in_msg_body~load_uint(8);
+            int freelancer_part = in_msg_body~load_uint(8);
+            in_msg_body.end_parse();
             throw_unless(error::invalid_parts, (freelancer_part + customer_part) == 100);
             cell body = begin_cell()
                 .store_uint(op::process_arbitration_master, 32)
                 .store_uint(query_id, 64)
                 .store_uint(storage::index, 64)
                 .store_uint(get_category(), 256)
-                .store_uint(freelancer_part, 8)
-                .store_uint(customer_part, 8)
                 .store_uint(order_index, 64)
+                .store_uint(customer_part, 8)
+                .store_uint(freelancer_part, 8)
                 .end_cell();
             messages::send_simple_non_bounceable(storage::master_address, 0, null(), body, 64);
             return ();
@@ -121,6 +125,7 @@ int get_category() {
 
         if (op == op::create_admin) {
             throw_unless(error::not_enough_ton, msg_value >= fee::admin_creation);
+            throw_unless(error:unauthorized, get_category() == "all"H);
             cell content = in_msg_body~load_dict();
             slice admin_address = in_msg_body~load_msg_addr();
             in_msg_body.end_parse();
@@ -128,7 +133,6 @@ int get_category() {
                 .store_uint(op::create_admin_master, 32)
                 .store_uint(query_id, 64)
                 .store_uint(storage::index, 64)
-                .store_uint(get_category(), 256)
                 .store_dict(content)
                 .store_slice(admin_address)
                 .end_cell();
@@ -138,6 +142,9 @@ int get_category() {
 
         throw(0xFFFF);
     }
+
+
+    ;; --------------- From Master ---------------
 
     if(equal_slices(sender_address, storage::master_address)) {
         if (op == op::revoke_admin) {
