@@ -7,18 +7,19 @@ import {
     buildUserContent,
     ResponseData,
 } from '../tests/utils/buildContent';
-import { toNano } from '@ton/core';
+import { beginCell, toNano } from '@ton/core';
 
 enum Operations {
     'build content for admin' = 1,
     'build content for user',
     'build content for order',
     'build content for response',
+    'build content for result'
 }
 
 export async function run(provider: NetworkProvider) {
     const ui = provider.ui();
-    const operation = await ui.choose('Operation:', ['1', '2', '3', '4'], (v: string) => Operations[parseInt(v)]);
+    const operation = await ui.choose('Operation:', ['1', '2', '3', '4', '5'], (v: string) => Operations[parseInt(v)]);
     switch (parseInt(operation)) {
         case 1:
             await buildContentForAdmin(provider);
@@ -31,6 +32,9 @@ export async function run(provider: NetworkProvider) {
             break;
         case 4:
             await buildContentForResponse(provider);
+            break;
+        case 5:
+            await buildContentForResult(provider);
             break;
     }
 }
@@ -74,6 +78,7 @@ async function buildContentForUser(provider: NetworkProvider) {
     const portfolio = await ui.input('Portfolio:');
     const resume = await ui.input('Resume:');
     const specialization = await ui.input('Specialization:');
+    const language = await ui.input('Language:');
 
     const content = buildUserContent({
         isUser,
@@ -85,6 +90,7 @@ async function buildContentForUser(provider: NetworkProvider) {
         portfolio,
         resume,
         specialization,
+        language,
     });
     ui.write(content.toBoc().toString('hex'));
 }
@@ -123,5 +129,12 @@ async function buildContentForResponse(provider: NetworkProvider) {
     };
 
     const content = buildResponseContent(data);
+    ui.write(content.toBoc().toString('hex'));
+}
+
+async function buildContentForResult(provider: NetworkProvider) {
+    const ui = provider.ui();
+    const text = await ui.input('Result text:');
+    const content = beginCell().storeStringTail(text).endCell();
     ui.write(content.toBoc().toString('hex'));
 }

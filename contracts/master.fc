@@ -15,12 +15,15 @@ global int storage::order_fee_denominator;
 global int storage::user_creation_fee;
 global int storage::order_creation_fee;
 
+global cell storage::languages;
+
 global int category::active;
 global int category::admin_count;
 global int category::active_order_count;
 global int category::hash;
 global int category::agreement_perc;
 global int category::admin_count_for_activate;
+global cell category::name;
 
 global slice msg::sender_address;
 global int msg::op;
@@ -62,6 +65,10 @@ _ admin_address:MsgAddressInt codes:^Codes indexes:^Indexes = MasterStorage;
     storage::order_fee_denominator = ds~load_uint(8);
     storage::user_creation_fee = ds~load_coins();
     storage::order_creation_fee = ds~load_coins();
+
+    storage::languages = ds~load_dict();
+
+    ds.end_parse();
 }
 
 () save_data() impure {
@@ -87,6 +94,7 @@ _ admin_address:MsgAddressInt codes:^Codes indexes:^Indexes = MasterStorage;
         .store_uint(storage::order_fee_denominator, 8)
         .store_coins(storage::user_creation_fee)
         .store_coins(storage::order_creation_fee)
+        .store_dict(storage::languages)
         .end_cell();
 
     set_data(data);
@@ -116,7 +124,13 @@ _ admin_address:MsgAddressInt codes:^Codes indexes:^Indexes = MasterStorage;
         category::hash = in_msg_body~load_uint(256);
         category::agreement_perc = in_msg_body~load_uint(64);
         category::admin_count_for_activate = in_msg_body~load_uint(16);
+        category::name = in_msg_body~load_ref();
         in_msg_body.end_parse();
+
+        ;; ----- start check sha256(name) -----
+;;        slice ns = category::name.begin_parse();
+;;        throw_unless(666, check_snake_hash(category::hash, ns));
+        ;; ----- end check sha256(name) -----
 
         (_, int f) = storage::categories.udict_get?(256, category::hash);
         throw_unless(error::category_already_exist, f == false);
@@ -124,6 +138,23 @@ _ admin_address:MsgAddressInt codes:^Codes indexes:^Indexes = MasterStorage;
         category::admin_count = 0;
         category::active_order_count = 0;
         save_category_data();
+        save_data();
+        return ();
+    }
+
+    if (msg::op == op::create_language) {
+        throw_unless(error:unauthorized, equal_slices(msg::sender_address, storage::root_address));
+        int lang::hash = in_msg_body~load_uint(256);
+        cell lang::name = in_msg_body~load_ref();
+        in_msg_body.end_parse();
+
+        ;; ----- start check sha256(name) -----
+;;        slice ns = lang::name.begin_parse();
+;;        throw_unless(666, check_snake_hash(lang::hash, ns));
+        ;; ----- end check sha256(name) -----
+
+        (storage::languages, int f) = storage::languages.udict_add_ref?(256, lang::hash, lang::name);
+        throw_unless(error::language_already_exist, f);
         save_data();
         return ();
     }
@@ -147,6 +178,13 @@ _ admin_address:MsgAddressInt codes:^Codes indexes:^Indexes = MasterStorage;
         in_msg_body.end_parse();
         throw_unless(error::not_enough_ton, msg_value >= (storage::user_creation_fee + fee::user_creation));
         raw_reserve(storage::user_creation_fee, 4);
+
+        (cell admin_lang, int f) = content.udict_get_ref?(256, hash::language);
+        throw_unless(error::invalid_content, f == true);
+        int lang_hash = admin_lang.begin_parse().preload_uint(256);
+        (_, int f) = storage::languages.udict_get_ref?(256, lang_hash);
+        throw_unless(error::language_not_exist, f);
+
         int user_index = storage::user_next_index;
         cell user_state_init = calculate_contract_state_init(user_index, storage::user_code);
         slice user_contract_address = calculate_contract_address(user_state_init);
@@ -245,6 +283,15 @@ _ admin_address:MsgAddressInt codes:^Codes indexes:^Indexes = MasterStorage;
         return ();
     }
 
+    if (msg::op == op::delete_language) {
+        throw_unless(error:unauthorized, equal_slices(msg::sender_address, storage::root_address));
+        int lang::hash = in_msg_body~load_uint(256);
+        in_msg_body.end_parse();
+        storage::languages~udict_delete?(256, lang::hash);
+        save_data();
+        return ();
+    }
+
     if (msg::op == op::withdraw_funds) {
         throw_unless(error:unauthorized, equal_slices(msg::sender_address, storage::root_address));
         raw_reserve(100000000, 0); ;; 0.1 TON
@@ -293,13 +340,34 @@ _ admin_address:MsgAddressInt codes:^Codes indexes:^Indexes = MasterStorage;
     return (storage::order_code, storage::user_code, storage::admin_code);
 }
 
-(int, int, int, int, int) get_category_data(int category_hash) method_id {
+(cell, int, int, int, int, int) get_category_data(int category_hash) method_id {
     load_data();
     load_category_data(category_hash);
-    return (category::active, category::admin_count, category::active_order_count, category::agreement_perc, category::admin_count_for_activate);
+    return (category::name, category::active, category::admin_count, category::active_order_count, category::agreement_perc, category::admin_count_for_activate);
+}
+
+cell get_language_data(int lang_hash) method_id {
+    load_data();
+    (cell lang::data, _) = storage::languages.udict_get_ref?(256, lang_hash);
+    return lang::data;
 }
 
 (slice, cell, int, int, int, int) get_master_data() method_id {
     load_data();
     return (storage::root_address, storage::categories, storage::order_fee_numerator, storage::order_fee_denominator, storage::user_creation_fee, storage::order_creation_fee);
+}
+
+(slice) get_order_address(int order_index) method_id {
+    load_data();
+    return calculate_contract_address(calculate_contract_state_init(order_index, storage::order_code));
+}
+
+(slice) get_user_address(int user_index) method_id {
+    load_data();
+    return calculate_contract_address(calculate_contract_state_init(user_index, storage::user_code));
+}
+
+(slice) get_admin_address(int admin_index) method_id {
+    load_data();
+    return calculate_contract_address(calculate_contract_state_init(admin_index, storage::admin_code));
 }
