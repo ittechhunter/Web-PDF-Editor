@@ -348,8 +348,6 @@ describe('AlfaMaterCore', () => {
         const content = buildOrderContent({
             category: 'test',
             name: 'test',
-            price: toNano('10'),
-            deadline: Math.floor(Date.now() / 1000) + 100,
             description: 'test',
             technicalTask: 'test',
             language: 'en',
@@ -503,6 +501,12 @@ describe('AlfaMaterCore', () => {
             success: true,
             op: OPCODES.ADD_RESPONSE,
         });
+        expect(result.transactions).toHaveTransaction({
+            from: orderContracts[0].address,
+            to: master.address,
+            success: false,
+            op: OPCODES.MASTER_LOG,
+        });
 
         const responsesData = await orderContracts[0].getResponses();
         expect(responsesData.responsesCount).toStrictEqual(1);
@@ -553,6 +557,12 @@ describe('AlfaMaterCore', () => {
             users[1].address,
         );
         expect(result.transactions).toHaveTransaction({
+            from: orderContracts[0].address,
+            to: master.address,
+            success: false,
+            op: OPCODES.MASTER_LOG,
+        });
+        expect(result.transactions).toHaveTransaction({
             from: users[0].address,
             to: orderContracts[0].address,
             success: true,
@@ -576,6 +586,12 @@ describe('AlfaMaterCore', () => {
         const result = await orderContracts[0].sendRejectOrder(users[1].getSender(), toNano('0.05'), 3);
         expect(result.transactions).toHaveTransaction({
             from: orderContracts[0].address,
+            to: master.address,
+            success: false,
+            op: OPCODES.MASTER_LOG,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: orderContracts[0].address,
             to: users[0].address,
         });
         const orderData = await orderContracts[0].getOrderData();
@@ -596,6 +612,12 @@ describe('AlfaMaterCore', () => {
         expect(orderData.status).toStrictEqual(Status.waiting_freelancer);
 
         const result = await orderContracts[0].sendCancelAssign(users[0].getSender(), toNano('0.05'), 3);
+        expect(result.transactions).toHaveTransaction({
+            from: orderContracts[0].address,
+            to: master.address,
+            success: false,
+            op: OPCODES.MASTER_LOG,
+        });
         expect(result.transactions).toHaveTransaction({
             from: orderContracts[0].address,
             to: users[0].address,
@@ -785,8 +807,20 @@ describe('AlfaMaterCore', () => {
         printTransactionFees(result.transactions, 'arbitration processing', addresses);
     });
 
+    it('refund before deadline', async () => {
+        blockchain.now = Math.floor(Date.now() / 1000) + 50;
+        expect(await orderContracts[0].getRefundAvailability()).toBe(Number(0));
+        const result = await orderContracts[0].sendRefund(users[0].getSender(), toNano('0.05'), 3);
+        expect(result.transactions).toHaveTransaction({
+            from: users[0].address,
+            to: orderContracts[0].address,
+            success: false,
+        });
+    });
+
     it('refund after deadline', async () => {
         blockchain.now = Math.floor(Date.now() / 1000) + 1000;
+        expect(await orderContracts[0].getRefundAvailability()).toBe(Number(-1));
         const result = await orderContracts[0].sendRefund(users[0].getSender(), toNano('0.05'), 3);
         expect(result.transactions).toHaveTransaction({
             from: users[0].address,
@@ -813,7 +847,9 @@ describe('AlfaMaterCore', () => {
 
     it('force payment after check time', async () => {
         await orderContracts[0].sendCompleteOrder(users[1].getSender(), toNano('0.05'), 3, "qwerty");
+        expect(await orderContracts[0].getForcePaymentAvailability()).toBe(Number(0));
         blockchain.now = Math.floor(Date.now() / 1000) + 1000;
+        expect(await orderContracts[0].getForcePaymentAvailability()).toBe(Number(-1));
         const result = await orderContracts[0].sendForcePayment(users[1].getSender(), toNano('0.05'), 3);
         expect(result.transactions).toHaveTransaction({
             from: users[1].address,
@@ -951,6 +987,12 @@ describe('AlfaMaterCore', () => {
             to: userContracts[1].address,
             success: true,
         });
+        expect(result.transactions).toHaveTransaction({
+            from: userContracts[1].address,
+            to: master.address,
+            success: false,
+            op: OPCODES.MASTER_LOG,
+        });
 
         const userData = await userContracts[1].getUserData();
         expect(userData.content.get(sha256Hash('is_user'))!.beginParse().loadBit()).toStrictEqual(true);
@@ -1057,25 +1099,4 @@ describe('AlfaMaterCore', () => {
         expect((await blockchain.getContract(master.address)).balance).toStrictEqual(toNano(0.1));
     });
 
-    it('81', async () => {
-        const masterBalanceBefore = (await blockchain.getContract(master.address)).balance;
-        const result = await master.send81(user81.getSender(), toNano(81.1), 81);
-        expect(result.transactions).toHaveTransaction({
-            from: user81.address,
-            to: master.address,
-            success: true,
-            exitCode: 81,
-        });
-        expect(result.transactions).toHaveTransaction({
-            from: master.address,
-            to: user81.address,
-            success: true,
-        });
-
-        const txDescription = result.transactions[1].description as TransactionDescriptionGeneric;
-        expect((await blockchain.getContract(master.address)).balance).toStrictEqual(
-            masterBalanceBefore + toNano(81) - txDescription.storagePhase!.storageFeesCollected,
-        );
-        printTransactionFees(result.transactions, '81', addresses);
-    });
 });

@@ -283,6 +283,7 @@ _ index:uint64 master_address:MsgAddressInt customer_address:MsgAddressInt freel
     if (op == op::refund) {
         throw_unless(error:unauthorized, equal_slices(sender_address, storage::customer_address));
         throw_unless(error::invalid_status, storage::status == status::in_progress);
+        throw_unless(error::too_early, now() > storage::deadline);
         notify_master_completion(query_id, 100000000, 1); ;; 0.1 TON
         cell body = begin_cell()
             .store_uint(op::order_completed, 32)
@@ -446,4 +447,34 @@ cell get_result() method_id {
     }
     (cell result, _) = content.udict_get_ref?(256, hash::result);
     return result;
+}
+
+(int) get_force_payment_availability() method_id {
+    load_data();
+    int available? = 0;
+    if (storage::status == status::fulfilled) {
+        if (now() > (storage::completed_at + storage::time_for_check)) {
+            available? = -1;
+        } else {
+            available? = 0;
+        }
+    } else {
+        available? = 0;
+    }
+    return available?;
+}
+
+(int) get_refund_availability() method_id {
+    load_data();
+    int available? = 0;
+    if (storage::status == status::in_progress) {
+        if (now() > storage::deadline) {
+            available? = -1;
+        } else {
+            available? = 0;
+        }
+    } else {
+        available? = 0;
+    }
+    return available?;
 }
